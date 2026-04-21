@@ -5,6 +5,11 @@ import pandas as pd
 import requests
 import io
 import unicodedata
+# import locale # Removido, pois não será mais necessário para a formatação manual
+
+# As chamadas a locale.setlocale também foram removidas, pois a formatação será manual.
+# Isso torna o código mais robusto e menos dependente do ambiente do servidor.
+
 
 LINK_PATIO      = "https://usinaxavantes-my.sharepoint.com/:x:/g/personal/jefferson_ferreira_usinaxavantes_onmicrosoft_com/IQAc3sFoxYzbSqL-j6ZoJWq-AbBgxlJpnRNc8KsTOFWuCqI?e=3JIXRs"
 SHEET_PLANEJADO = "Pátio_Máquina_Planejado"
@@ -143,9 +148,42 @@ def safe_val(row, col, default="—"):
 def formatar_potencia(kw):
     if kw <= 0:
         return "—"
+
+    value = kw
+    unit = " kW"
     if kw >= 1000:
-        return f"{kw / 1000:,.2f} MW".replace(",", ".")
-    return f"{kw:,.0f} kW".replace(",", ".")
+        value = kw / 1000
+        unit = " MW"
+
+    # Formata o número com 2 casas decimais (ou 0 para kW se não for MW)
+    # Usa a formatação padrão de f-string, que usa '.' como separador decimal.
+    # Em seguida, aplica manualmente a formatação brasileira.
+    if unit == " MW":
+        formatted_value = f"{value:.2f}" # Ex: "20.86" ou "49.11"
+    else: # kW
+        formatted_value = f"{value:.0f}" # Ex: "56"
+
+    # Divide em parte inteira e parte decimal
+    parts = formatted_value.split('.')
+    integer_part = parts[0]
+    decimal_part = parts[1] if len(parts) > 1 else ""
+
+    # Adiciona separador de milhar à parte inteira (estilo brasileiro: '.')
+    # Percorre a parte inteira de trás para frente para adicionar os pontos
+    n = len(integer_part)
+    formatted_integer_part = ""
+    for i, digit in enumerate(integer_part):
+        formatted_integer_part += digit
+        # Adiciona ponto a cada 3 dígitos da direita para a esquerda, mas não no início
+        if (n - 1 - i) % 3 == 0 and (n - 1 - i) != 0:
+            formatted_integer_part += "."
+
+    # Combina com vírgula como separador decimal
+    final_string = formatted_integer_part
+    if decimal_part:
+        final_string += "," + decimal_part
+
+    return final_string + unit
 
 
 def contar_maquinas(df):
@@ -262,6 +300,7 @@ def processar_aba(xl, sheet_name, tem_origem=False):
     df = df[df["base"].between(1, 36)]
 
     if "pot_maquina" in df.columns:
+        # Se o Excel usa vírgula, esta linha já converte para ponto para o pandas interpretar
         df["pot_maquina_num"] = pd.to_numeric(
             df["pot_maquina"].astype(str).str.replace(",", "."), errors="coerce"
         ).fillna(0)
