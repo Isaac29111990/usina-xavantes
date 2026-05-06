@@ -182,7 +182,7 @@ def salvar_manutencao(label, faixa, horimetro, data_registro, responsavel, obser
         dados[label]["ultimos_horimetros_por_faixa"][str(faixa)] = horimetro # Para faixas numéricas, guardamos o horímetro
 
     with open(ARQUIVO_MANUTENCOES, "w", encoding="utf-8") as f:
-        json.dump(dados, f, ensure_ascii=False, indent=2)
+        json.dump(dados, f, indent=2, ensure_ascii=False)
     if atualizar_horimetro and faixa != "checklist":
         salvar_horimetro(label, horimetro, data_registro)
 
@@ -762,7 +762,7 @@ def painel_detalhe(base_num, df_posicoes, cor, tem_origem=False, modo_horimetro=
                 '<div style="background:linear-gradient(135deg, #0a1a2a 0%, #0f2030 100%); '
                 'border:2px solid #06b6d4; border-radius:16px; padding:20px 24px; margin-top:8px;">'
                 '<div style="color:#06b6d4; font-size:13px; font-weight:700; '
-                'text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">'
+                'text-transform:uppercase; letter-spacing:1px;">'
                 '🕐 Registrar Horímetro — Máquina ' + label_ativo + '</div>'
                 '<div style="color:#8888aa; font-size:11px;">'
                 'Último valor registrado: <strong style="color:#e0e0f0;">' + hor_fmt + ' h</strong>'
@@ -1245,7 +1245,7 @@ def formulario_registro(maq_sel, faixa_sel, hor_atual, faixas, key_suffix, user_
         '<div style="background:linear-gradient(135deg, #0a1a0a 0%, #0f2010 100%); '
         'border:2px solid ' + cor_form + '; border-radius:16px; padding:18px 22px; margin-top:12px;">'
         '<div style="color:' + cor_form + '; font-size:13px; font-weight:700; '
-        'text-transform:uppercase; letter-spacing:1px; margin-bottom:2px;">'
+        'text-transform:uppercase; letter-spacing:1px;">'
         + titulo_form + ' — ' + maq_sel + '</div>'
         '<div style="color:#8888aa; font-size:11px;">' + itens_txt + '</div>'
         '</div>',
@@ -1690,6 +1690,7 @@ def tela_manutencao(df_plan, erros):
                     for idx, row in enumerate(grupo):
                         label        = row.get("label", str(base_sel))
                         modelo_motor = safe_val(row, "modelo_motor")
+                        serie_motor  = safe_val(row, "serie_motor") # Adicionado: Obter série do motor
                         reg_hor      = dados_hor.get(label, {})
                         hor_atual    = reg_hor.get("horimetro", None)
                         hist_manu    = dados_manu.get(label, {}).get("historico", [])
@@ -1725,6 +1726,9 @@ def tela_manutencao(df_plan, erros):
                                 '<div style="color:' + cor + '; font-size:14px; font-weight:800;">' + label + '</div>'
                                 '<div style="color:#8888aa; font-size:10px; margin-top:4px;">Motor</div>'
                                 '<div style="color:#e0e0f0; font-size:11px;">' + modelo_motor + '</div>'
+                                # Adicionado: Exibir número de série do motor
+                                '<div style="color:#8888aa; font-size:10px; margin-top:4px;">Nº de Série Motor</div>'
+                                '<div style="color:#e0e0f0; font-size:11px;">' + serie_motor + '</div>'
                                 '<div style="color:#8888aa; font-size:10px; margin-top:6px;">Horímetro</div>'
                                 '<div style="color:#e0e0f0; font-size:12px; font-weight:700;">' + hor_txt + '</div>'
                                 '<div style="color:#8888aa; font-size:10px; margin-top:6px;">Próx. manutenção</div>'
@@ -1757,6 +1761,7 @@ def tela_manutencao(df_plan, erros):
 
                     row_maq      = df_pos[df_pos["label"] == maq_sel].iloc[0]
                     modelo_motor = safe_val(row_maq, "modelo_motor")
+                    serie_motor  = safe_val(row_maq, "serie_motor") # Adicionado: Obter série do motor
                     tipo, plano  = get_plano(modelo_motor)
                     faixas       = plano["faixas"]
                     reg_hor      = dados_hor.get(maq_sel, {})
@@ -1772,7 +1777,7 @@ def tela_manutencao(df_plan, erros):
                         'padding:16px 22px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">'
                         '<div>'
                         '<div style="color:#06b6d4; font-size:16px; font-weight:800;">🔧 Máquina ' + maq_sel + '</div>'
-                        '<div style="color:#8888aa; font-size:12px;">' + modelo_motor + ' — Plano ' + tipo.upper() + '</div>'
+                        '<div style="color:#8888aa; font-size:12px;">' + modelo_motor + ' — Série: ' + serie_motor + ' — Plano ' + tipo.upper() + '</div>' # Atualizado
                         '</div>'
                         '<div style="display:flex; gap:24px; align-items:center;">'
                         '<div style="text-align:right;">'
