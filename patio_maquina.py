@@ -27,27 +27,34 @@ GOOGLE_SHEETS_CREDENTIALS_FILE = "credentials.json" # Nome do arquivo JSON que v
 GOOGLE_SHEETS_SPREADSHEET_NAME = "Xavantes_Go" # Nome da sua planilha principal no Google Sheets
 
 # --- Variáveis globais para a conexão com o Google Sheets ---
-gc = None # Cliente gspread
-spreadsheet = None # Planilha principal
+# REMOVA OU COMENTE ESTAS LINHAS:
+# gc = None # Cliente gspread
+# spreadsheet = None # Planilha principal
 
 @st.cache_resource # Usa cache_resource para objetos que não são serializáveis facilmente
 def init_google_sheets_cached():
     """Inicializa a conexão com o Google Sheets e a armazena em cache."""
     try:
-        gc = gspread.service_account(filename=GOOGLE_SHEETS_CREDENTIALS_FILE)
+        # Esta parte precisa ser ajustada para lidar com o Streamlit Cloud Secrets
+        # conforme a minha sugestão anterior de usar st.secrets
+        if "GCP_SERVICE_ACCOUNT" in st.secrets: # Se estiver no Streamlit Cloud
+            gc = gspread.service_account_from_dict(st.secrets["GCP_SERVICE_ACCOUNT"])
+        else: # Se estiver rodando localmente
+            gc = gspread.service_account(filename=GOOGLE_SHEETS_CREDENTIALS_FILE)
+
         spreadsheet = gc.open(GOOGLE_SHEETS_SPREADSHEET_NAME)
         st.success("Conectado ao Google Sheets com sucesso!")
         return gc, spreadsheet
     except Exception as e:
         st.error(f"Erro ao conectar ao Google Sheets: {e}")
-        st.stop()
+        st.stop() # Interrompe a execução do script se a conexão falhar
 
 # No seu código principal, chame assim:
 gc, spreadsheet = init_google_sheets_cached()
 # E remova a função init_google_sheets() e as variáveis globais gc, spreadsheet
 
-# Chame a função de inicialização no início do seu script, antes de qualquer operação com Sheets
-init_google_sheets_cached()
+# REMOVA ESTA LINHA:
+# init_google_sheets_cached() # Esta chamada é redundante e causa o problema
 
 # --- Funções para carregar/salvar colaboradores ---
 # REMOVA OU COMENTE ESTAS LINHAS:
