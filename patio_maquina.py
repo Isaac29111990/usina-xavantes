@@ -11,6 +11,8 @@ import io
 import unicodedata
 from datetime import date, datetime, timedelta
 import hashlib # Importado para hash de senhas
+import gspread
+
 
 LINK_PATIO             = "https://usinaxavantes-my.sharepoint.com/:x:/g/personal/jefferson_ferreira_usinaxavantes_onmicrosoft_com/IQAc3sFoxYzbSqL-j6ZoJWq-AbBgxlJpnRNc8KsTOFWuCqI?e=3JIXRs"
 SHEET_PLANEJADO        = "Pátio_Máquina_Planejado"
@@ -28,20 +30,24 @@ GOOGLE_SHEETS_SPREADSHEET_NAME = "Xavantes_Go" # Nome da sua planilha principal 
 gc = None # Cliente gspread
 spreadsheet = None # Planilha principal
 
-def init_google_sheets():
-    """Inicializa a conexão com o Google Sheets."""
-    global gc, spreadsheet
-    if gc is None:
-        try:
-            gc = gspread.service_account(filename=GOOGLE_SHEETS_CREDENTIALS_FILE)
-            spreadsheet = gc.open(GOOGLE_SHEETS_SPREADSHEET_NAME)
-            st.success("Conectado ao Google Sheets com sucesso!")
-        except Exception as e:
-            st.error(f"Erro ao conectar ao Google Sheets: {e}")
-            st.stop() # Interrompe a execução se não conseguir conectar
+@st.cache_resource # Usa cache_resource para objetos que não são serializáveis facilmente
+def init_google_sheets_cached():
+    """Inicializa a conexão com o Google Sheets e a armazena em cache."""
+    try:
+        gc = gspread.service_account(filename=GOOGLE_SHEETS_CREDENTIALS_FILE)
+        spreadsheet = gc.open(GOOGLE_SHEETS_SPREADSHEET_NAME)
+        st.success("Conectado ao Google Sheets com sucesso!")
+        return gc, spreadsheet
+    except Exception as e:
+        st.error(f"Erro ao conectar ao Google Sheets: {e}")
+        st.stop()
+
+# No seu código principal, chame assim:
+gc, spreadsheet = init_google_sheets_cached()
+# E remova a função init_google_sheets() e as variáveis globais gc, spreadsheet
 
 # Chame a função de inicialização no início do seu script, antes de qualquer operação com Sheets
-init_google_sheets()
+init_google_sheets_cached()
 
 # --- Funções para carregar/salvar colaboradores ---
 # REMOVA OU COMENTE ESTAS LINHAS:
@@ -51,6 +57,7 @@ init_google_sheets()
 # if not os.path.exists(ARQUIVO_COLABORADORES): ...
 
 # --- Funções para carregar/salvar colaboradores (AGORA DO GOOGLE SHEETS) ---
+@st.cache_data(ttl=300) # Cache por 5 minutos (300 segundos)
 def load_colaboradores():
     if spreadsheet is None:
         st.error("Conexão com Google Sheets não estabelecida.")
@@ -87,25 +94,25 @@ def save_colaboradores(colaboradores):
 # --- Inicialização de colaboradores (APENAS PARA O PRIMEIRO USO NO SHEETS) ---
 # Se a aba 'Colaboradores' estiver vazia, você pode adicionar os iniciais.
 # REMOVA OU COMENTE ESTE BLOCO APÓS A PRIMEIRA EXECUÇÃO E CONFIGURAÇÃO DOS SEUS COLABORADORES REAIS NA PLANILHA
-# if not load_colaboradores(): # Verifica se a aba está vazia
-#     try:
-#         worksheet = spreadsheet.worksheet("Colaboradores")
-#     except gspread.exceptions.WorksheetNotFound:
-#         worksheet = spreadsheet.add_worksheet(title="Colaboradores", rows="1", cols="2")
-#         worksheet.append_row(["nome", "area"])
+if not load_colaboradores(): # Verifica se a aba está vazia
+     try:
+         worksheet = spreadsheet.worksheet("Colaboradores")
+     except gspread.exceptions.WorksheetNotFound:
+         worksheet = spreadsheet.add_worksheet(title="Colaboradores", rows="1", cols="2")
+         worksheet.append_row(["nome", "area"])
 #
-#     initial_colaboradores_list = [
-#         {"nome": "Hiago José", "area": "Elétrica"},
-#         {"nome": "Marcelo Cirino", "area": "Serralheria"},
-#         {"nome": "Paulo Borges", "area": "Mecânica"},
-#         {"nome": "Wesnalton Carneiro", "area": "Mecânica"},
-#         {"nome": "Ramom Lima", "area": "Operação"}
-#     ]
+     initial_colaboradores_list = [
+         {"nome": "Hiago José", "area": "Elétrica"},
+         {"nome": "Marcelo Cirino", "area": "Serralheria"},
+         {"nome": "Paulo Borges", "area": "Mecânica"},
+         {"nome": "Wesnalton Carneiro", "area": "Mecânica"},
+         {"nome": "Ramom Lima", "area": "Operação"}
+     ]
 #     # Adiciona os colaboradores iniciais se a aba estiver vazia
-#     if not worksheet.get_all_records(): # Verifica novamente se está realmente vazia
-#         for colab in initial_colaboradores_list:
-#             worksheet.append_row([colab["nome"], colab["area"]])
-#         st.success("Colaboradores iniciais adicionados à aba 'Colaboradores'.")
+     if not worksheet.get_all_records(): # Verifica novamente se está realmente vazia
+         for colab in initial_colaboradores_list:
+             worksheet.append_row([colab["nome"], colab["area"]])
+         st.success("Colaboradores iniciais adicionados à aba 'Colaboradores'.")
 # -----------------------------------------------------------------------------
 # --- Funções para carregar/salvar horas extras ---
 import json
@@ -118,6 +125,7 @@ import os
 # def add_horas_extras_registro(colaborador, data, horas, tipo, observacao): ...
 
 # --- Funções para carregar/salvar horas extras (AGORA DO GOOGLE SHEETS) ---
+@st.cache_data(ttl=300) # Cache por 5 minutos (300 segundos)
 def load_horas_extras():
     if spreadsheet is None:
         st.error("Conexão com Google Sheets não estabelecida.")
@@ -251,6 +259,7 @@ def authenticate(username, password):
 # if not os.path.exists(USERS_FILE): ...
 
 # --- Funções para carregar/salvar usuários (AGORA DO GOOGLE SHEETS) ---
+@st.cache_data(ttl=300) # Cache por 5 minutos (300 segundos)
 def load_users():
     if spreadsheet is None:
         st.error("Conexão com Google Sheets não estabelecida.")
@@ -286,22 +295,22 @@ def save_users(users):
 # --- Inicialização de usuários (APENAS PARA O PRIMEIRO USO NO SHEETS) ---
 # Se a aba 'Usuarios' estiver vazia, você pode adicionar os iniciais.
 # REMOVA OU COMENTE ESTE BLOCO APÓS A PRIMEIRA EXECUÇÃO E CONFIGURAÇÃO DOS SEUS USUÁRIOS REAIS NA PLANILHA
-# if not load_users(): # Verifica se a aba está vazia
-#     try:
-#         worksheet = spreadsheet.worksheet("Usuarios")
-#     except gspread.exceptions.WorksheetNotFound:
-#         worksheet = spreadsheet.add_worksheet(title="Usuarios", rows="1", cols="3")
-#         worksheet.append_row(["username", "password_hash", "profile"])
-#
-#     initial_users_list = [
-#         {"username": "engenharia", "password_hash": hash_password("engxavantes"), "profile": "engenharia"},
-#         {"username": "operador",   "password_hash": hash_password("operador123"),   "profile": "operacao"}
-#     ]
-#     # Adiciona os usuários iniciais se a aba estiver vazia
-#     if not worksheet.get_all_records(): # Verifica novamente se está realmente vazia
-#         for user in initial_users_list:
-#             worksheet.append_row([user["username"], user["password_hash"], user["profile"]])
-#         st.success("Usuários iniciais adicionados à aba 'Usuarios'.")
+if not load_users(): # Verifica se a aba está vazia
+    try:
+        worksheet = spreadsheet.worksheet("Usuarios")
+    except gspread.exceptions.WorksheetNotFound:
+         worksheet = spreadsheet.add_worksheet(title="Usuarios", rows="1", cols="3")
+         worksheet.append_row(["username", "password_hash", "profile"])
+
+    initial_users_list = [
+         {"username": "engenharia", "password_hash": hash_password("engxavantes"), "profile": "engenharia"},
+         {"username": "operador",   "password_hash": hash_password("operador123"),   "profile": "operacao"}
+     ]
+     # Adiciona os usuários iniciais se a aba estiver vazia
+    if not worksheet.get_all_records(): # Verifica novamente se está realmente vazia
+         for user in initial_users_list:
+             worksheet.append_row([user["username"], user["password_hash"], user["profile"]])
+         st.success("Usuários iniciais adicionados à aba 'Usuarios'.")
 # -----------------------------------------------------------------------------
 
 
@@ -313,6 +322,7 @@ def save_users(users):
 # def salvar_horimetro(label, valor, data_registro): ...
 
 # --- Funções para carregar/salvar horimetros (AGORA DO GOOGLE SHEETS) ---
+@st.cache_data(ttl=300) # Cache por 5 minutos (300 segundos)
 def carregar_horimetros():
     if spreadsheet is None:
         st.error("Conexão com Google Sheets não estabelecida.")
