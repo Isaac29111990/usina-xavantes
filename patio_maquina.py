@@ -50,34 +50,42 @@ if not os.path.exists(ARQUIVO_COLABORADORES):
     # st.success("Colaboradores iniciais criados.")
 # -----------------------------------------------------------------------------
 # --- Funções para carregar/salvar horas extras ---
-def load_horas_extras():
-    if os.path.exists(ARQUIVO_HORAS_EXTRAS):
-        try:
-            with open(ARQUIVO_HORAS_EXTRAS, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                # Garante que o retorno seja sempre um dicionário, mesmo que o JSON esteja vazio
-                return data if isinstance(data, dict) else {}
-        except Exception:
-            # Se houver erro na leitura ou o arquivo não for um JSON válido, retorna um dicionário vazio
-            return {}
-    # Se o arquivo não existe, retorna um dicionário vazio
-    return {}
+import json
+import os
 
-def save_horas_extras(horas_extras_data):
-    with open(ARQUIVO_HORAS_EXTRAS, "w", encoding="utf-8") as f:
-        json.dump(horas_extras_data, f, indent=2, ensure_ascii=False)
+# Nome do arquivo onde os dados serão salvos
+DB_FILE = "horas_extras.json"
+
+def load_horas_extras():
+    """Carrega os registros de horas extras do arquivo JSON."""
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {} # Retorna um dicionário vazio se o arquivo não existir
+
+def save_horas_extras(data):
+    """Salva os registros de horas extras no arquivo JSON."""
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 def add_horas_extras_registro(colaborador, data, horas, tipo, observacao):
-    horas_extras_data = load_horas_extras()
-    if colaborador not in horas_extras_data:
-        horas_extras_data[colaborador] = []
-    horas_extras_data[colaborador].append({
-        "data": str(data),
+    """Adiciona um novo registro de horas extras/negativas."""
+    horas_extras_registros = load_horas_extras()
+
+    # Garante que o colaborador exista no dicionário
+    if colaborador not in horas_extras_registros:
+        horas_extras_registros[colaborador] = []
+
+    # Adiciona o novo registro
+    horas_extras_registros[colaborador].append({
+        "area": st.session_state.colaboradores_data[colaborador]["area"], # Pega a área do colaborador
+        "data": data.strftime("%Y-%m-%d"), # Formata a data para string
         "horas": horas,
-        "tipo": tipo, # "extra" ou "negativa"
+        "tipo": tipo,
         "observacao": observacao
     })
-    save_horas_extras(horas_extras_data)
+
+    save_horas_extras(horas_extras_registros)
 
 PLANOS_MANUTENCAO = {
     "scania": {
