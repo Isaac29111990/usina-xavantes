@@ -2356,22 +2356,46 @@ def tela_horas_extras():
     if colaborador_selecionado == "Todos":
         st.info("Selecione um colaborador específico para lançar horas.")
     else:
+        # Inicializa o estado da sessão para o tipo de lançamento, se ainda não existir
+        if "tipo_lancamento_state" not in st.session_state:
+            st.session_state.tipo_lancamento_state = "Cálculo Automático (Entrada/Saída)"
+
+        # Mover o st.radio para FORA do st.form
+        col_data, col_tipo_lancamento = st.columns([1, 1])
+        with col_data:
+            data_lancamento = st.date_input("Data do Ponto", value=date.today(), key="he_data_lancamento_fora_form")
+        with col_tipo_lancamento:
+            # O st.radio agora está fora do formulário, então on_change é permitido
+            tipo_lancamento_selecionado = st.radio(
+                "Tipo de Lançamento",
+                ("Cálculo Automático (Entrada/Saída)", "Feriado (Horas Trabalhadas)", "Utilizar Banco de Horas (Dia Completo)"),
+                key="he_tipo_lancamento_fora_form",
+                on_change=lambda: st.session_state.update(tipo_lancamento_state=st.session_state.he_tipo_lancamento_fora_form)
+            )
+        # Atualiza o tipo_lancamento para a lógica abaixo
+        tipo_lancamento = st.session_state.tipo_lancamento_state
+
         with st.form("form_lancar_horas_extras"):
-            col_data, col_entrada, col_saida = st.columns([1, 1, 1])
-            with col_data:
-                data_lancamento = st.date_input("Data do Ponto", value=date.today(), key="he_data_lancamento")
-            with col_entrada:
-                hora_entrada = st.time_input("Hora de Entrada", value=datetime.strptime("08:00", "%H:%M").time(), key="he_hora_entrada")
-            with col_saida:
-                hora_saida = st.time_input("Hora de Saída", value=datetime.strptime("17:00", "%H:%M").time(), key="he_hora_saida")
+            # A data do ponto é passada para o formulário
+            # st.write(f"Data do Ponto: {data_lancamento.strftime('%Y-%m-%d')}") # Opcional: exibir a data selecionada
 
-            observacao_lancamento = st.text_area("Observação (opcional)", key="he_observacao_lancamento")
+            horas_para_registrar = 0.0
+            tipo_registro = "extra" # Default, pode ser alterado
 
-            submitted = st.form_submit_button("Registrar Ponto")
-            if submitted:
+            # --- Componentes de entrada de horas (visibilidade controlada pelo tipo_lancamento) ---
+            default_hora_entrada = datetime.strptime("08:00", "%H:%M").time()
+            default_hora_saida = datetime.strptime("17:00", "%H:%M").time()
+
+            if tipo_lancamento in ["Cálculo Automático (Entrada/Saída)", "Feriado (Horas Trabalhadas)"]:
+                col_entrada, col_saida = st.columns([1, 1])
+                with col_entrada:
+                    hora_entrada_val = st.time_input("Hora de Entrada", value=default_hora_entrada, key="he_hora_entrada")
+                with col_saida:
+                    hora_saida_val = st.time_input("Hora de Saída", value=default_hora_saida, key="he_hora_saida")
+
                 # Converter horas para objetos datetime para cálculo
-                dt_entrada = datetime.combine(data_lancamento, hora_entrada)
-                dt_saida   = datetime.combine(data_lancamento, hora_saida)
+                dt_entrada = datetime.combine(data_lancamento, hora_entrada_val)
+                dt_saida   = datetime.combine(data_lancamento, hora_saida_val)
 
                 # Se a hora de saída for menor que a de entrada, assume que virou o dia
                 if dt_saida < dt_entrada:
@@ -2387,13 +2411,34 @@ def tela_horas_extras():
                 # Jornada padrão de 8h48m = 8.8 horas
                 jornada_padrao_horas = 8.8
 
-                horas_para_registrar = duracao_liquida_trabalhada - jornada_padrao_horas
+                if tipo_lancamento == "Cálculo Automático (Entrada/Saída)":
+                    horas_para_registrar = duracao_liquida_trabalhada - jornada_padrao_horas
+                    tipo_registro = "extra" if horas_para_registrar >= 0 else "negativa"
 
-                tipo_registro = "extra" if horas_para_registrar >= 0 else "negativa"
+                elif tipo_lancamento == "Feriado (Horas Trabalhadas)":
+                    # Em feriado, todas as horas líquidas trabalhadas são extras
+                    horas_para_registrar = duracao_liquida_trabalhada
+                    tipo_registro = "extra"
+                    if horas_para_registrar < 0: # Garante que não registre horas negativas em feriado
+                        horas_para_registrar = 0.0
+                    st.info(f"Serão registradas {horas_para_registrar:.2f} horas extras de feriado.")
 
+            elif tipo_lancamento == "Utilizar Banco de Horas (Dia Completo)":
+                # Jornada padrão de 8h48m = 8.8 horas
+                jornada_padrao_horas = 8.8
+                horas_para_registrar = -jornada_padrao_horas # Abate um dia completo
+                tipo_registro = "negativa"
+                st.info(f"Serão abatidas {jornada_padrao_horas:.2f} horas do banco de horas do colaborador.")
+
+
+            observacao_lancamento = st.text_area("Observação (opcional)", key="he_observacao_lancamento")
+
+            # O st.form_submit_button DEVE estar dentro do st.form
+            submitted = st.form_submit_button("Registrar Ponto")
+            if submitted:
                 add_horas_extras_registro(
                     colaborador_selecionado,
-                    data_lancamento,
+                    data_lancamento, # Usa a data selecionada fora do form
                     horas_para_registrar,
                     tipo_registro,
                     observacao_lancamento
@@ -2428,9 +2473,7 @@ def tela_horas_extras():
 
         # Calcular saldo
         saldo_periodo = df_he_periodo["horas"].sum()
-        saldo_acumulado_total = df_he["horas"].sum()
 
-        # --- Cards de Resumo ---
         st.markdown("#### Resumo do Período Selecionado")
         col1, col2, col3 = st.columns(3)
 
@@ -2557,5 +2600,5 @@ def tela_horas_extras():
 
     else:
         st.info("Nenhum registro de horas extras/negativas encontrado para os filtros aplicados.")
-        
+                                                         
 main()
