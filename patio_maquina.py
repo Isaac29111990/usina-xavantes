@@ -18,6 +18,66 @@ POTENCIA_CONTRATADA_MW = 50.40
 ARQUIVO_HORIMETROS     = "horimetros.json"
 ARQUIVO_MANUTENCOES    = "manutencoes.json"
 USERS_FILE             = "users.json" # Novo arquivo para usuários
+# Adicione estas novas constantes no início do seu código, junto com as outras constantes de arquivo
+ARQUIVO_COLABORADORES = "colaboradores.json"
+ARQUIVO_HORAS_EXTRAS  = "horas_extras.json"
+
+# --- Funções para carregar/salvar colaboradores ---
+def load_colaboradores():
+    if os.path.exists(ARQUIVO_COLABORADORES):
+        try:
+            with open(ARQUIVO_COLABORADORES, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_colaboradores(colaboradores):
+    with open(ARQUIVO_COLABORADORES, "w", encoding="utf-8") as f:
+        json.dump(colaboradores, f, indent=2, ensure_ascii=False)
+
+# --- Inicialização de colaboradores (apenas para o primeiro uso) ---
+# REMOVA OU COMENTE ESTE BLOCO APÓS A PRIMEIRA EXECUÇÃO E CONFIGURAÇÃO DOS SEUS COLABORADORES REAIS
+if not os.path.exists(ARQUIVO_COLABORADORES):
+    initial_colaboradores = {
+        "Hiago José":        {"area": "Elétrica"},
+        "Marcelo Cirino":    {"area": "Serralheria"},
+        "Paulo Borges":      {"area": "Mecânica"},
+        "Wesnalton Carneiro": {"area": "Mecânica"},
+        "Ramom Lima":        {"area": "Operação"}
+    }
+    save_colaboradores(initial_colaboradores)
+    # st.success("Colaboradores iniciais criados.")
+# -----------------------------------------------------------------------------
+# --- Funções para carregar/salvar horas extras ---
+def load_horas_extras():
+    if os.path.exists(ARQUIVO_HORAS_EXTRAS):
+        try:
+            with open(ARQUIVO_HORAS_EXTRAS, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                # Garante que o retorno seja sempre um dicionário, mesmo que o JSON esteja vazio
+                return data if isinstance(data, dict) else {}
+        except Exception:
+            # Se houver erro na leitura ou o arquivo não for um JSON válido, retorna um dicionário vazio
+            return {}
+    # Se o arquivo não existe, retorna um dicionário vazio
+    return {}
+
+def save_horas_extras(horas_extras_data):
+    with open(ARQUIVO_HORAS_EXTRAS, "w", encoding="utf-8") as f:
+        json.dump(horas_extras_data, f, indent=2, ensure_ascii=False)
+
+def add_horas_extras_registro(colaborador, data, horas, tipo, observacao):
+    horas_extras_data = load_horas_extras()
+    if colaborador not in horas_extras_data:
+        horas_extras_data[colaborador] = []
+    horas_extras_data[colaborador].append({
+        "data": str(data),
+        "horas": horas,
+        "tipo": tipo, # "extra" ou "negativa"
+        "observacao": observacao
+    })
+    save_horas_extras(horas_extras_data)
 
 PLANOS_MANUTENCAO = {
     "scania": {
@@ -113,7 +173,7 @@ if not os.path.exists(USERS_FILE):
         "operador":   {"password_hash": hash_password("operador123"),   "profile": "operacao"}
     }
     save_users(initial_users)
-    st.success("Usuários iniciais criados: engenharia/engxavantes, operador/operador123")
+    # st.success("Usuários iniciais criados: engenharia/engxavantes, operador/operador123")
 # -----------------------------------------------------------------------------
 
 
@@ -2111,6 +2171,14 @@ def main():
                 st.session_state["base_sel"]         = None
                 st.session_state["editar_horimetro"] = None
                 st.rerun()
+                
+                        # Botão "Controle de Horas Extras" apenas para Engenharia
+        if user_profile == "engenharia":
+            if st.button("⏰ Controle de Horas Extras"):
+                st.session_state["tela"]             = "horas_extras"
+                st.session_state["base_sel"]         = None
+                st.session_state["editar_horimetro"] = None
+                st.rerun()
 
         if st.button("🔄 Recarregar dados"):
             st.cache_data.clear()
@@ -2212,6 +2280,282 @@ def main():
             st.error("Acesso negado. Você não tem permissão para visualizar esta página.")
             st.session_state["tela"] = "home" # Redireciona para a home
             st.rerun()
+            
+    elif tela == "horas_extras":
+        # Verifica se o usuário tem permissão para acessar esta tela
+        if user_profile == "engenharia":
+            tela_horas_extras()
+        else:
+            st.error("Acesso negado. Você não tem permissão para visualizar esta página.")
+            st.session_state["tela"] = "home" # Redireciona para a home
+            st.rerun() 
+# Adicione esta função em qualquer lugar fora da função main(),
+# preferencialmente junto com as outras funções de tela (tela_home, tela_patio, etc.)
+def tela_horas_extras():
+    st.markdown(
+        '<div style="display:flex; align-items:center; gap:16px; margin-bottom:4px;">'
+        '<div style="font-size:32px;">⏰</div>'
+        '<div>'
+        '<h1 style="margin:0; font-size:28px; font-weight:900; color:#e0e0f0;">Controle de Horas Extras</h1>'
+        '<p style="margin:0; color:#8888aa; font-size:13px;">Gestão de banco de horas por colaborador</p>'
+        '</div></div>',
+        unsafe_allow_html=True
+    )
+    st.markdown("<hr class='separador'>", unsafe_allow_html=True)
+
+    colaboradores_data = load_colaboradores()
+    colaboradores_nomes = sorted(list(colaboradores_data.keys()))
+
+    if not colaboradores_nomes:
+        st.warning("Nenhum colaborador cadastrado. Por favor, adicione colaboradores no arquivo 'colaboradores.json'.")
+        return
+
+    # --- Filtros ---
+    st.markdown("### 🔎 Filtros")
+    col_colab, col_data_inicio_ponto, col_data_fim_ponto = st.columns([2, 1, 1])
+
+    with col_colab:
+        # Mantemos o seletor de colaborador, mas ele agora afeta apenas o formulário de lançamento
+        # e a tabela de histórico detalhado, não o gráfico de acúmulo principal.
+        colaborador_selecionado = st.selectbox(
+            "Selecione o Colaborador para Lançamento/Detalhes",
+            options=["Todos"] + colaboradores_nomes,
+            key="he_colaborador_sel"
+        )
+
+    # Lógica para o período de fechamento de ponto (16 ao 15)
+    today = date.today()
+    if today.day >= 16:
+        data_inicio_default = date(today.year, today.month, 16)
+        # Calcula o dia 15 do próximo mês
+        proximo_mes = today.replace(day=1) + timedelta(days=32)
+        data_fim_default    = proximo_mes.replace(day=15)
+    else:
+        data_fim_default    = date(today.year, today.month, 15)
+        # Calcula o dia 16 do mês anterior
+        mes_anterior = today.replace(day=1) - timedelta(days=1)
+        data_inicio_default = mes_anterior.replace(day=16)
+
+    with col_data_inicio_ponto:
+        data_inicio_ponto = st.date_input(
+            "Início do Período",
+            value=data_inicio_default,
+            key="he_data_inicio_ponto"
+        )
+    with col_data_fim_ponto:
+        data_fim_ponto = st.date_input(
+            "Fim do Período",
+            value=data_fim_default,
+            key="he_data_fim_ponto"
+        )
+
+    st.markdown("<hr class='separador'>", unsafe_allow_html=True)
+
+    # --- Lançamento de Horas ---
+    st.markdown("### ➕ Lançar Horas de Ponto")
+    if colaborador_selecionado == "Todos":
+        st.info("Selecione um colaborador específico para lançar horas.")
+    else:
+        with st.form("form_lancar_horas_extras"):
+            col_data, col_entrada, col_saida = st.columns([1, 1, 1])
+            with col_data:
+                data_lancamento = st.date_input("Data do Ponto", value=date.today(), key="he_data_lancamento")
+            with col_entrada:
+                hora_entrada = st.time_input("Hora de Entrada", value=datetime.strptime("08:00", "%H:%M").time(), key="he_hora_entrada")
+            with col_saida:
+                hora_saida = st.time_input("Hora de Saída", value=datetime.strptime("17:00", "%H:%M").time(), key="he_hora_saida")
+
+            observacao_lancamento = st.text_area("Observação (opcional)", key="he_observacao_lancamento")
+
+            submitted = st.form_submit_button("Registrar Ponto")
+            if submitted:
+                # Converter horas para objetos datetime para cálculo
+                dt_entrada = datetime.combine(data_lancamento, hora_entrada)
+                dt_saida   = datetime.combine(data_lancamento, hora_saida)
+
+                # Se a hora de saída for menor que a de entrada, assume que virou o dia
+                if dt_saida < dt_entrada:
+                    dt_saida += timedelta(days=1)
+
+                duracao_total_trabalhada = dt_saida - dt_entrada
+                duracao_total_horas      = duracao_total_trabalhada.total_seconds() / 3600
+
+                # --- Descontar o intervalo de almoço (1h12m = 1.2 horas) ---
+                intervalo_almoco_horas = 1.2 # 1 hora e 12 minutos
+                duracao_liquida_trabalhada = duracao_total_horas - intervalo_almoco_horas
+
+                # Jornada padrão de 8h48m = 8.8 horas
+                jornada_padrao_horas = 8.8
+
+                horas_para_registrar = duracao_liquida_trabalhada - jornada_padrao_horas
+
+                tipo_registro = "extra" if horas_para_registrar >= 0 else "negativa"
+
+                add_horas_extras_registro(
+                    colaborador_selecionado,
+                    data_lancamento,
+                    horas_para_registrar,
+                    tipo_registro,
+                    observacao_lancamento
+                )
+                st.success(f"Ponto registrado para {colaborador_selecionado}: {horas_para_registrar:.2f}h ({tipo_registro.capitalize()})!")
+                st.rerun() # Recarrega para atualizar os dados exibidos
+
+    st.markdown("<hr class='separador'>", unsafe_allow_html=True)
+
+    # --- Exibição de Dados e Gráficos ---
+    st.markdown("### 📊 Resumo e Histórico")
+
+    horas_extras_registros = load_horas_extras()
+    df_he = pd.DataFrame()
+
+    # Sempre carregamos todos os registros para os gráficos e saldos gerais
+    all_records = []
+    for colab, records in horas_extras_registros.items():
+        for rec in records:
+            rec_copy = rec.copy()
+            rec_copy["colaborador"] = colab
+            rec_copy["area"] = colaboradores_data.get(colab, {}).get("area", "Desconhecida")
+            all_records.append(rec_copy)
+    if all_records:
+        df_he = pd.DataFrame(all_records)
+        df_he["data"] = pd.to_datetime(df_he["data"])
+        df_he = df_he.sort_values("data")
+
+    if not df_he.empty:
+        # Filtrar por período de ponto (afeta todos os gráficos e saldos)
+        df_he_periodo = df_he[(df_he["data"].dt.date >= data_inicio_ponto) & (df_he["data"].dt.date <= data_fim_ponto)]
+
+        # Calcular saldo
+        saldo_periodo = df_he_periodo["horas"].sum()
+        saldo_acumulado_total = df_he["horas"].sum()
+
+        # --- Cards de Resumo ---
+        st.markdown("#### Resumo do Período Selecionado")
+        col1, col2, col3 = st.columns(3)
+
+        total_extras = df_he_periodo[df_he_periodo["horas"] > 0]["horas"].sum()
+        total_negativas = df_he_periodo[df_he_periodo["horas"] < 0]["horas"].sum()
+
+        with col1:
+            st.markdown(
+                f'<div style="background:#1e1e32; border:1px solid #3a3a5a; border-radius:12px; padding:10px; text-align:center;">'
+                f'<div style="color:#8888aa; font-size:12px;">Horas Extras</div>'
+                f'<div style="color:#28a745; font-size:20px; font-weight:700;">{total_extras:.2f} h</div>'
+                f'</div>'.replace('.', ','), unsafe_allow_html=True
+            )
+        with col2:
+            st.markdown(
+                f'<div style="background:#1e1e32; border:1px solid #3a3a5a; border-radius:12px; padding:10px; text-align:center;">'
+                f'<div style="color:#8888aa; font-size:12px;">Horas Negativas</div>'
+                f'<div style="color:#dc3545; font-size:20px; font-weight:700;">{total_negativas:.2f} h</div>'
+                f'</div>'.replace('.', ','), unsafe_allow_html=True
+            )
+        with col3:
+            st.markdown(
+                f'<div style="background:#1e1e32; border:1px solid #3a3a5a; border-radius:12px; padding:10px; text-align:center;">'
+                f'<div style="color:#8888aa; font-size:12px;">Saldo Final</div>'
+                f'<div style="color:#e0e0f0; font-size:20px; font-weight:700;">{saldo_periodo:.2f} h</div>'
+                f'</div>'.replace('.', ','), unsafe_allow_html=True
+            )
+        st.markdown("<br>", unsafe_allow_html=True) # Espaçamento
+
+        # --- GRÁFICO: Saldo de Horas por Colaborador (Eixo X: Colaborador, Eixo Y: Saldo) - Gráfico de LINHAS com rótulos ---
+        st.markdown("#### Saldo de Horas por Colaborador (Período Atual)")
+        if not df_he_periodo.empty:
+            saldo_por_colaborador = df_he_periodo.groupby("colaborador")["horas"].sum().reset_index()
+
+            # Ordenar por colaborador para consistência
+            saldo_por_colaborador = saldo_por_colaborador.sort_values("colaborador")
+
+            fig_saldo_colab = px.line( # Alterado para px.line
+                saldo_por_colaborador,
+                x="colaborador", # Eixo X agora é o nome do colaborador
+                y="horas",
+                title="Saldo Total de Horas por Colaborador",
+                labels={"colaborador": "Colaborador", "horas": "Saldo de Horas (h)"},
+                color_discrete_sequence=["#FFFFFF"], # Cor branca para a linha
+                hover_data={"horas": ":.2f"} # Formata o hover para 2 casas decimais
+            )
+            fig_saldo_colab.update_layout(
+                paper_bgcolor="#0f0f1a",
+                plot_bgcolor="#0f0f1a",
+                font={"color": "#e0e0f0"},
+                xaxis={"gridcolor": "#2a2a4a", "linecolor": "#2a2a4a"},
+                yaxis={"gridcolor": "#2a2a4a", "linecolor": "#2a2a4a"},
+                title_font_color="#e0e0f0"
+            )
+            # Adicionar marcadores para cada ponto (colaborador)
+            fig_saldo_colab.update_traces(mode='lines+markers')
+
+            # --- Adicionar rótulos de texto com o valor das horas ---
+            for index, row in saldo_por_colaborador.iterrows():
+                fig_saldo_colab.add_annotation(
+                    x=row["colaborador"],
+                    y=row["horas"],
+                    text=f"{row['horas']:.2f}h".replace('.', ','), # Formata o texto com vírgula
+                    showarrow=False,
+                    yshift=10, # Desloca o texto um pouco para cima do ponto
+                    font=dict(color="#FFFFFF", size=10) # Cor e tamanho do texto
+                )
+
+            st.plotly_chart(fig_saldo_colab, use_container_width=True, key="fig_saldo_colaborador")
+        else:
+            st.info("Nenhum registro no período para exibir o saldo por colaborador.")
 
 
+        # --- Gráfico de Horas por Área (mantido) ---
+        st.markdown("#### Horas por Área (Período Atual)")
+        if not df_he_periodo.empty:
+            horas_por_area = df_he_periodo.groupby("area")["horas"].sum().reset_index()
+            fig_area = px.bar(
+                horas_por_area,
+                x="area",
+                y="horas",
+                title="Total de Horas Extras/Negativas por Área no Período",
+                labels={"area": "Área", "horas": "Total de Horas (h)"},
+                color="area",
+                color_discrete_sequence=px.colors.qualitative.Plotly
+            )
+            fig_area.update_layout(
+                paper_bgcolor="#0f0f1a",
+                plot_bgcolor="#0f0f1a",
+                font={"color": "#e0e0f0"},
+                xaxis={"gridcolor": "#2a2a4a", "linecolor": "#2a2a4a"},
+                yaxis={"gridcolor": "#2a2a4a", "linecolor": "#2a2a4a"},
+                title_font_color="#e0e0f0"
+            )
+            st.plotly_chart(fig_area, use_container_width=True, key="fig_horas_por_area")
+        else:
+            st.info("Nenhum registro no período para exibir o gráfico por área.")
+
+
+        st.markdown("#### Histórico Detalhado")
+        # Exibir histórico detalhado, filtrado pelo período de ponto
+        # Se "Todos" estiver selecionado, mostra todos os colaboradores no período
+        # Se um colaborador específico estiver selecionado, mostra apenas ele no período
+        if colaborador_selecionado != "Todos":
+            df_he_detalhado = df_he_periodo[df_he_periodo["colaborador"] == colaborador_selecionado].copy()
+        else:
+            df_he_detalhado = df_he_periodo.copy()
+
+        if not df_he_detalhado.empty:
+            df_he_detalhado["data"] = df_he_detalhado["data"].dt.strftime("%Y-%m-%d")
+            # --- Formatação para vírgula na tabela ---
+            df_he_detalhado["horas"] = df_he_detalhado["horas"].apply(lambda x: f"{x:.2f}".replace('.', ',') + " h")
+            df_he_detalhado = df_he_detalhado.rename(columns={
+                "colaborador": "Colaborador",
+                "area": "Área",
+                "data": "Data",
+                "horas": "Horas",
+                "tipo": "Tipo",
+                "observacao": "Observação"
+            })
+            st.dataframe(df_he_detalhado[["Colaborador", "Área", "Data", "Horas", "Tipo", "Observação"]], use_container_width=True, hide_index=True)
+        else:
+            st.info("Nenhum registro de horas extras/negativas encontrado para os filtros aplicados.")
+
+    else:
+        st.info("Nenhum registro de horas extras/negativas encontrado para os filtros aplicados.")
+        
 main()
