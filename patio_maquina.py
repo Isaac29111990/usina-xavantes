@@ -15,77 +15,157 @@ import hashlib # Importado para hash de senhas
 LINK_PATIO             = "https://usinaxavantes-my.sharepoint.com/:x:/g/personal/jefferson_ferreira_usinaxavantes_onmicrosoft_com/IQAc3sFoxYzbSqL-j6ZoJWq-AbBgxlJpnRNc8KsTOFWuCqI?e=3JIXRs"
 SHEET_PLANEJADO        = "Pátio_Máquina_Planejado"
 POTENCIA_CONTRATADA_MW = 50.40
-ARQUIVO_HORIMETROS     = "horimetros.json"
-ARQUIVO_MANUTENCOES    = "manutencoes.json"
-USERS_FILE             = "users.json" # Novo arquivo para usuários
-# Adicione estas novas constantes no início do seu código, junto com as outras constantes de arquivo
-ARQUIVO_COLABORADORES = "colaboradores.json"
-ARQUIVO_HORAS_EXTRAS  = "horas_extras.json"
+
+# ... (suas importações existentes)
+import gspread # Adicione esta linha
+# ... (suas constantes existentes)
+
+# --- Configurações do Google Sheets ---
+GOOGLE_SHEETS_CREDENTIALS_FILE = "credentials.json" # Nome do arquivo JSON que você baixou
+GOOGLE_SHEETS_SPREADSHEET_NAME = "Xavantes_Go" # Nome da sua planilha principal no Google Sheets
+
+# --- Variáveis globais para a conexão com o Google Sheets ---
+gc = None # Cliente gspread
+spreadsheet = None # Planilha principal
+
+def init_google_sheets():
+    """Inicializa a conexão com o Google Sheets."""
+    global gc, spreadsheet
+    if gc is None:
+        try:
+            gc = gspread.service_account(filename=GOOGLE_SHEETS_CREDENTIALS_FILE)
+            spreadsheet = gc.open(GOOGLE_SHEETS_SPREADSHEET_NAME)
+            st.success("Conectado ao Google Sheets com sucesso!")
+        except Exception as e:
+            st.error(f"Erro ao conectar ao Google Sheets: {e}")
+            st.stop() # Interrompe a execução se não conseguir conectar
+
+# Chame a função de inicialização no início do seu script, antes de qualquer operação com Sheets
+init_google_sheets()
 
 # --- Funções para carregar/salvar colaboradores ---
+# REMOVA OU COMENTE ESTAS LINHAS:
+# ARQUIVO_COLABORADORES = "colaboradores.json"
+# def load_colaboradores(): ...
+# def save_colaboradores(colaboradores): ...
+# if not os.path.exists(ARQUIVO_COLABORADORES): ...
+
+# --- Funções para carregar/salvar colaboradores (AGORA DO GOOGLE SHEETS) ---
 def load_colaboradores():
-    if os.path.exists(ARQUIVO_COLABORADORES):
-        try:
-            with open(ARQUIVO_COLABORADORES, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
+    if spreadsheet is None:
+        st.error("Conexão com Google Sheets não estabelecida.")
+        return {}
+    try:
+        worksheet = spreadsheet.worksheet("Colaboradores") # Nome da aba
+        data = worksheet.get_all_records() # Obtém todos os dados como lista de dicionários
+        colaboradores_dict = {}
+        for row in data:
+            nome = row.get("nome")
+            area = row.get("area")
+            if nome:
+                colaboradores_dict[nome] = {"area": area}
+        return colaboradores_dict
+    except gspread.exceptions.WorksheetNotFound:
+        st.warning("Aba 'Colaboradores' não encontrada. Criando cabeçalhos.")
+        worksheet = spreadsheet.add_worksheet(title="Colaboradores", rows="1", cols="2")
+        worksheet.append_row(["nome", "area"])
+        return {}
+    except Exception as e:
+        st.error(f"Erro ao carregar colaboradores do Google Sheets: {e}")
+        return {}
 
 def save_colaboradores(colaboradores):
-    with open(ARQUIVO_COLABORADORES, "w", encoding="utf-8") as f:
-        json.dump(colaboradores, f, indent=2, ensure_ascii=False)
+    # Para colaboradores, geralmente carregamos tudo, modificamos em memória e salvamos tudo de volta.
+    # No entanto, para evitar sobrescrever dados de outros usuários,
+    # é melhor ter uma estratégia de atualização mais granular ou recarregar antes de salvar.
+    # Por enquanto, esta função não será usada diretamente para salvar, apenas para carregar.
+    # A adição/edição de colaboradores será feita manualmente na planilha ou via uma interface específica.
+    # Se precisar de uma função de salvar, ela precisaria limpar a aba e reescrever.
+    # Por simplicidade, vamos considerar que a aba 'Colaboradores' é gerenciada manualmente.
+    pass # Manteremos esta função vazia por enquanto, pois a gestão será manual na planilha.
 
-# --- Inicialização de colaboradores (apenas para o primeiro uso) ---
-# REMOVA OU COMENTE ESTE BLOCO APÓS A PRIMEIRA EXECUÇÃO E CONFIGURAÇÃO DOS SEUS COLABORADORES REAIS
-if not os.path.exists(ARQUIVO_COLABORADORES):
-    initial_colaboradores = {
-        "Hiago José":        {"area": "Elétrica"},
-        "Marcelo Cirino":    {"area": "Serralheria"},
-        "Paulo Borges":      {"area": "Mecânica"},
-        "Wesnalton Carneiro": {"area": "Mecânica"},
-        "Ramom Lima":        {"area": "Operação"}
-    }
-    save_colaboradores(initial_colaboradores)
-    # st.success("Colaboradores iniciais criados.")
+# --- Inicialização de colaboradores (APENAS PARA O PRIMEIRO USO NO SHEETS) ---
+# Se a aba 'Colaboradores' estiver vazia, você pode adicionar os iniciais.
+# REMOVA OU COMENTE ESTE BLOCO APÓS A PRIMEIRA EXECUÇÃO E CONFIGURAÇÃO DOS SEUS COLABORADORES REAIS NA PLANILHA
+# if not load_colaboradores(): # Verifica se a aba está vazia
+#     try:
+#         worksheet = spreadsheet.worksheet("Colaboradores")
+#     except gspread.exceptions.WorksheetNotFound:
+#         worksheet = spreadsheet.add_worksheet(title="Colaboradores", rows="1", cols="2")
+#         worksheet.append_row(["nome", "area"])
+#
+#     initial_colaboradores_list = [
+#         {"nome": "Hiago José", "area": "Elétrica"},
+#         {"nome": "Marcelo Cirino", "area": "Serralheria"},
+#         {"nome": "Paulo Borges", "area": "Mecânica"},
+#         {"nome": "Wesnalton Carneiro", "area": "Mecânica"},
+#         {"nome": "Ramom Lima", "area": "Operação"}
+#     ]
+#     # Adiciona os colaboradores iniciais se a aba estiver vazia
+#     if not worksheet.get_all_records(): # Verifica novamente se está realmente vazia
+#         for colab in initial_colaboradores_list:
+#             worksheet.append_row([colab["nome"], colab["area"]])
+#         st.success("Colaboradores iniciais adicionados à aba 'Colaboradores'.")
 # -----------------------------------------------------------------------------
 # --- Funções para carregar/salvar horas extras ---
 import json
 import os
 
-# Nome do arquivo onde os dados serão salvos
-DB_FILE = "horas_extras.json"
+# REMOVA OU COMENTE ESTAS LINHAS:
+# ARQUIVO_HORAS_EXTRAS = "horas_extras.json"
+# def load_horas_extras(): ...
+# def save_horas_extras(horas_extras_data): ...
+# def add_horas_extras_registro(colaborador, data, horas, tipo, observacao): ...
 
+# --- Funções para carregar/salvar horas extras (AGORA DO GOOGLE SHEETS) ---
 def load_horas_extras():
-    """Carrega os registros de horas extras do arquivo JSON."""
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {} # Retorna um dicionário vazio se o arquivo não existir
-
-def save_horas_extras(data):
-    """Salva os registros de horas extras no arquivo JSON."""
-    with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+    if spreadsheet is None:
+        st.error("Conexão com Google Sheets não estabelecida.")
+        return {}
+    try:
+        worksheet = spreadsheet.worksheet("Horas_Extras") # Nome da aba
+        data = worksheet.get_all_records()
+        horas_extras_dict = {}
+        for row in data:
+            colaborador = row.get("colaborador")
+            if colaborador:
+                if colaborador not in horas_extras_dict:
+                    horas_extras_dict[colaborador] = []
+                horas_extras_dict[colaborador].append({
+                    "data": str(row.get("data")),
+                    "horas": float(row.get("horas", 0)), # Garante que seja float
+                    "tipo": str(row.get("tipo")),
+                    "observacao": str(row.get("observacao", ""))
+                })
+        return horas_extras_dict
+    except gspread.exceptions.WorksheetNotFound:
+        st.warning("Aba 'Horas_Extras' não encontrada. Criando cabeçalhos.")
+        worksheet = spreadsheet.add_worksheet(title="Horas_Extras", rows="1", cols="5")
+        worksheet.append_row(["colaborador", "data", "horas", "tipo", "observacao"])
+        return {}
+    except Exception as e:
+        st.error(f"Erro ao carregar horas extras do Google Sheets: {e}")
+        return {}
 
 def add_horas_extras_registro(colaborador, data, horas, tipo, observacao):
-    """Adiciona um novo registro de horas extras/negativas."""
-    horas_extras_registros = load_horas_extras()
+    if spreadsheet is None:
+        st.error("Conexão com Google Sheets não estabelecida.")
+        return
 
-    # Garante que o colaborador exista no dicionário
-    if colaborador not in horas_extras_registros:
-        horas_extras_registros[colaborador] = []
+    try:
+        worksheet = spreadsheet.worksheet("Horas_Extras")
+    except gspread.exceptions.WorksheetNotFound:
+        worksheet = spreadsheet.add_worksheet(title="Horas_Extras", rows="1", cols="5")
+        worksheet.append_row(["colaborador", "data", "horas", "tipo", "observacao"])
 
-    # Adiciona o novo registro
-    horas_extras_registros[colaborador].append({
-        "area": st.session_state.colaboradores_data[colaborador]["area"], # Pega a área do colaborador
-        "data": data.strftime("%Y-%m-%d"), # Formata a data para string
-        "horas": horas,
-        "tipo": tipo,
-        "observacao": observacao
-    })
-
-    save_horas_extras(horas_extras_registros)
+    # Adiciona uma nova linha à aba
+    worksheet.append_row([
+        colaborador,
+        str(data), # Garante que a data seja string no formato YYYY-MM-DD
+        horas,
+        tipo,
+        observacao
+    ])
 
 PLANOS_MANUTENCAO = {
     "scania": {
@@ -153,107 +233,227 @@ st.markdown("""
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-def load_users():
-    if os.path.exists(USERS_FILE):
-        try:
-            with open(USERS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
-
-def save_users(users):
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, indent=2, ensure_ascii=False)
+# A função load_users foi substituída, mas authenticate precisa dela
+# def load_users(): ... (agora vem do Sheets)
 
 def authenticate(username, password):
-    users = load_users()
+    users = load_users() # Esta função agora carrega do Google Sheets
     user_info = users.get(username)
     if user_info and user_info["password_hash"] == hash_password(password):
         return user_info["profile"]
     return None
 
-# --- Inicialização de usuários (apenas para o primeiro uso) ---
-# REMOVA OU COMENTE ESTE BLOCO APÓS A PRIMEIRA EXECUÇÃO E CONFIGURAÇÃO DOS SEUS USUÁRIOS REAIS
-if not os.path.exists(USERS_FILE):
-    initial_users = {
-        "engenharia": {"password_hash": hash_password("engxavantes"), "profile": "engenharia"},
-        "operador":   {"password_hash": hash_password("operador123"),   "profile": "operacao"}
-    }
-    save_users(initial_users)
-    # st.success("Usuários iniciais criados: engenharia/engxavantes, operador/operador123")
+
+# REMOVA OU COMENTE ESTAS LINHAS:
+# USERS_FILE = "users.json"
+# def load_users(): ...
+# def save_users(users): ...
+# if not os.path.exists(USERS_FILE): ...
+
+# --- Funções para carregar/salvar usuários (AGORA DO GOOGLE SHEETS) ---
+def load_users():
+    if spreadsheet is None:
+        st.error("Conexão com Google Sheets não estabelecida.")
+        return {}
+    try:
+        worksheet = spreadsheet.worksheet("Usuarios") # Nome da aba
+        data = worksheet.get_all_records()
+        users_dict = {}
+        for row in data:
+            username = row.get("username")
+            if username:
+                users_dict[username] = {
+                    "password_hash": str(row.get("password_hash")),
+                    "profile": str(row.get("profile"))
+                }
+        return users_dict
+    except gspread.exceptions.WorksheetNotFound:
+        st.warning("Aba 'Usuarios' não encontrada. Criando cabeçalhos.")
+        worksheet = spreadsheet.add_worksheet(title="Usuarios", rows="1", cols="3")
+        worksheet.append_row(["username", "password_hash", "profile"])
+        return {}
+    except Exception as e:
+        st.error(f"Erro ao carregar usuários do Google Sheets: {e}")
+        return {}
+
+def save_users(users):
+    # Para usuários, geralmente carregamos tudo, modificamos em memória e salvamos tudo de volta.
+    # No entanto, para evitar sobrescrever dados de outros usuários,
+    # é melhor ter uma estratégia de atualização mais granular ou recarregar antes de salvar.
+    # Por simplicidade, vamos considerar que a aba 'Usuarios' é gerenciada manualmente.
+    pass # Manteremos esta função vazia por enquanto, pois a gestão será manual na planilha.
+
+# --- Inicialização de usuários (APENAS PARA O PRIMEIRO USO NO SHEETS) ---
+# Se a aba 'Usuarios' estiver vazia, você pode adicionar os iniciais.
+# REMOVA OU COMENTE ESTE BLOCO APÓS A PRIMEIRA EXECUÇÃO E CONFIGURAÇÃO DOS SEUS USUÁRIOS REAIS NA PLANILHA
+# if not load_users(): # Verifica se a aba está vazia
+#     try:
+#         worksheet = spreadsheet.worksheet("Usuarios")
+#     except gspread.exceptions.WorksheetNotFound:
+#         worksheet = spreadsheet.add_worksheet(title="Usuarios", rows="1", cols="3")
+#         worksheet.append_row(["username", "password_hash", "profile"])
+#
+#     initial_users_list = [
+#         {"username": "engenharia", "password_hash": hash_password("engxavantes"), "profile": "engenharia"},
+#         {"username": "operador",   "password_hash": hash_password("operador123"),   "profile": "operacao"}
+#     ]
+#     # Adiciona os usuários iniciais se a aba estiver vazia
+#     if not worksheet.get_all_records(): # Verifica novamente se está realmente vazia
+#         for user in initial_users_list:
+#             worksheet.append_row([user["username"], user["password_hash"], user["profile"]])
+#         st.success("Usuários iniciais adicionados à aba 'Usuarios'.")
 # -----------------------------------------------------------------------------
 
 
 # ── helpers de persistência ───────────────────────────────────────────────────
 
-def carregar_horimetros():
-    if os.path.exists(ARQUIVO_HORIMETROS):
-        try:
-            with open(ARQUIVO_HORIMETROS, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
+# REMOVA OU COMENTE ESTAS LINHAS:
+# ARQUIVO_HORIMETROS = "horimetros.json"
+# def carregar_horimetros(): ...
+# def salvar_horimetro(label, valor, data_registro): ...
 
+# --- Funções para carregar/salvar horimetros (AGORA DO GOOGLE SHEETS) ---
+def carregar_horimetros():
+    if spreadsheet is None:
+        st.error("Conexão com Google Sheets não estabelecida.")
+        return {}
+    try:
+        worksheet = spreadsheet.worksheet("Horimetros") # Nome da aba
+        data = worksheet.get_all_records()
+        horimetros_dict = {}
+        for row in data:
+            label = row.get("label")
+            if label:
+                horimetro = float(row.get("horimetro", 0))
+                data_reg = str(row.get("data"))
+                if label not in horimetros_dict:
+                    horimetros_dict[label] = {"horimetro": 0, "data": "", "historico": []}
+                # Sempre mantém o último registro como o "atual"
+                if horimetro > horimetros_dict[label]["horimetro"]:
+                    horimetros_dict[label]["horimetro"] = horimetro
+                    horimetros_dict[label]["data"] = data_reg
+                horimetros_dict[label]["historico"].append({"horimetro": horimetro, "data": data_reg})
+        return horimetros_dict
+    except gspread.exceptions.WorksheetNotFound:
+        st.warning("Aba 'Horimetros' não encontrada. Criando cabeçalhos.")
+        worksheet = spreadsheet.add_worksheet(title="Horimetros", rows="1", cols="3")
+        worksheet.append_row(["label", "horimetro", "data"])
+        return {}
+    except Exception as e:
+        st.error(f"Erro ao carregar horímetros do Google Sheets: {e}")
+        return {}
 
 def salvar_horimetro(label, valor, data_registro):
-    dados     = carregar_horimetros()
-    historico = dados.get(label, {}).get("historico", [])
-    historico.append({"horimetro": valor, "data": str(data_registro)})
-    dados[label] = {"horimetro": valor, "data": str(data_registro), "historico": historico}
-    with open(ARQUIVO_HORIMETROS, "w", encoding="utf-8") as f:
-        json.dump(dados, f, ensure_ascii=False, indent=2)
+    if spreadsheet is None:
+        st.error("Conexão com Google Sheets não estabelecida.")
+        return
+
+    try:
+        worksheet = spreadsheet.worksheet("Horimetros")
+    except gspread.exceptions.WorksheetNotFound:
+        worksheet = spreadsheet.add_worksheet(title="Horimetros", rows="1", cols="3")
+        worksheet.append_row(["label", "horimetro", "data"])
+
+    # Adiciona uma nova linha à aba
+    worksheet.append_row([
+        label,
+        valor,
+        str(data_registro) # Garante que a data seja string no formato YYYY-MM-DD
+    ])
 
 
+# REMOVA OU COMENTE ESTAS LINHAS:
+# ARQUIVO_MANUTENCOES = "manutencoes.json"
+# def carregar_manutencoes(): ...
+# def salvar_manutencao(label, faixa, horimetro, data_registro, responsavel, observacao, atualizar_horimetro=True): ...
+
+# --- Funções para carregar/salvar manutenções (AGORA DO GOOGLE SHEETS) ---
 def carregar_manutencoes():
-    if os.path.exists(ARQUIVO_MANUTENCOES):
-        try:
-            with open(ARQUIVO_MANUTENCOES, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
+    if spreadsheet is None:
+        st.error("Conexão com Google Sheets não estabelecida.")
+        return {}
+    try:
+        worksheet = spreadsheet.worksheet("Manutencoes") # Nome da aba
+        data = worksheet.get_all_records()
+        manutencoes_dict = {}
+        for row in data:
+            label = row.get("label")
+            if label:
+                if label not in manutencoes_dict:
+                    manutencoes_dict[label] = {"historico": [], "ultimos_horimetros_por_faixa": {}}
 
+                faixa = row.get("faixa")
+                horimetro = float(row.get("horimetro", 0))
+                data_reg = str(row.get("data"))
+                responsavel = str(row.get("responsavel", ""))
+                observacao = str(row.get("observacao", ""))
+
+                manutencoes_dict[label]["historico"].append({
+                    "faixa": faixa,
+                    "horimetro": horimetro,
+                    "data": data_reg,
+                    "responsavel": responsavel,
+                    "observacao": observacao
+                })
+
+                # Atualiza o último horímetro para esta faixa específica
+                # Para checklist, guardamos a data, para outros, o horímetro
+                if faixa == "checklist":
+                    # Converte para datetime para comparar e pegar a mais recente
+                    current_date = datetime.strptime(data_reg, "%Y-%m-%d").date()
+                    last_recorded_date_str = manutencoes_dict[label]["ultimos_horimetros_por_faixa"].get("checklist")
+                    if last_recorded_date_str:
+                        last_recorded_date = datetime.strptime(last_recorded_date_str, "%Y-%m-%d").date()
+                        if current_date > last_recorded_date:
+                            manutencoes_dict[label]["ultimos_horimetros_por_faixa"]["checklist"] = data_reg
+                    else:
+                        manutencoes_dict[label]["ultimos_horimetros_por_faixa"]["checklist"] = data_reg
+                else:
+                    # Garante que a faixa seja tratada como string para chave do dicionário
+                    faixa_key = str(faixa)
+                    if horimetro > manutencoes_dict[label]["ultimos_horimetros_por_faixa"].get(faixa_key, 0):
+                        manutencoes_dict[label]["ultimos_horimetros_por_faixa"][faixa_key] = horimetro
+
+                # Atualiza os dados da última manutenção geral (a mais recente no histórico)
+                # Isso é feito iterativamente, então o último registro no loop será o "último"
+                manutencoes_dict[label]["ultima_faixa"] = faixa
+                manutencoes_dict[label]["ultimo_horimetro"] = horimetro
+                manutencoes_dict[label]["ultima_data"] = data_reg
+                manutencoes_dict[label]["ultimo_responsavel"] = responsavel
+
+        return manutencoes_dict
+    except gspread.exceptions.WorksheetNotFound:
+        st.warning("Aba 'Manutencoes' não encontrada. Criando cabeçalhos.")
+        worksheet = spreadsheet.add_worksheet(title="Manutencoes", rows="1", cols="6")
+        worksheet.append_row(["label", "faixa", "horimetro", "data", "responsavel", "observacao"])
+        return {}
+    except Exception as e:
+        st.error(f"Erro ao carregar manutenções do Google Sheets: {e}")
+        return {}
 
 def salvar_manutencao(label, faixa, horimetro, data_registro, responsavel, observacao, atualizar_horimetro=True):
-    dados = carregar_manutencoes()
-    if label not in dados:
-        # Se a máquina não existe, inicializa com a estrutura completa
-        dados[label] = {"historico": [], "ultimos_horimetros_por_faixa": {}}
-    else:
-        # Se a máquina existe, mas a chave 'ultimos_horimetros_por_faixa' não, inicializa-a
-        # Isso é crucial para dados antigos ou se o arquivo foi criado sem essa chave
-        if "ultimos_horimetros_por_faixa" not in dados[label]:
-            dados[label]["ultimos_horimetros_por_faixa"] = {}
+    if spreadsheet is None:
+        st.error("Conexão com Google Sheets não estabelecida.")
+        return
 
-    historico = dados[label].get("historico", [])
-    historico.append({
-        "faixa":       faixa,
-        "horimetro":   horimetro,
-        "data":        str(data_registro),
-        "responsavel": responsavel,
-        "observacao":  observacao,
-    })
-    dados[label]["historico"] = historico
+    try:
+        worksheet = spreadsheet.worksheet("Manutencoes")
+    except gspread.exceptions.WorksheetNotFound:
+        worksheet = spreadsheet.add_worksheet(title="Manutencoes", rows="1", cols="6")
+        worksheet.append_row(["label", "faixa", "horimetro", "data", "responsavel", "observacao"])
 
-    # Atualiza os dados da última manutenção geral
-    dados[label]["ultima_faixa"]       = faixa
-    dados[label]["ultimo_horimetro"]   = horimetro
-    dados[label]["ultima_data"]        = str(data_registro)
-    dados[label]["ultimo_responsavel"] = responsavel
+    # Adiciona uma nova linha à aba
+    worksheet.append_row([
+        label,
+        faixa,
+        horimetro,
+        str(data_registro), # Garante que a data seja string no formato YYYY-MM-DD
+        responsavel,
+        observacao
+    ])
 
-    # NOVO: Atualiza o último horímetro para esta faixa específica
-    if faixa == "checklist":
-        dados[label]["ultimos_horimetros_por_faixa"]["checklist"] = str(data_registro) # Para checklist, guardamos a data
-    else:
-        dados[label]["ultimos_horimetros_por_faixa"][str(faixa)] = horimetro # Para faixas numéricas, guardamos o horímetro
-
-    with open(ARQUIVO_MANUTENCOES, "w", encoding="utf-8") as f:
-        json.dump(dados, f, indent=2, ensure_ascii=False)
     if atualizar_horimetro and faixa != "checklist":
         salvar_horimetro(label, horimetro, data_registro)
-
 
 # ── lógica de manutenção ──────────────────────────────────────────────────────
 
