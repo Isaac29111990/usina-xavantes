@@ -419,7 +419,7 @@ def status_badge_html(status_raw):
         emoji, label = "🟡", safe_val_str(status_raw, "Manutenção")
     else:
         emoji, label = "⚪", safe_val_str(status_raw, "Não informado")
-    return f'<span class="status-badge status-{classe}">{emoji} {label}</span>'
+    return f'<span class="status-badge status-{classe}" contenteditable="true">{emoji} {label}</span>'
 
 
 def safe_val_str(status_raw, fallback):
@@ -477,6 +477,7 @@ def processar_aba(xl, sheet_name):
     col_mod_alt   = encontrar_coluna(df.columns, ["MODELO ALTERNADOR", "ALTERNADOR MODELO"])
     col_ser_alt   = encontrar_coluna(df.columns, ["SÉRIE ALTERNADOR", "SERIE ALTERNADOR"])
     col_status    = encontrar_coluna(df.columns, ["STATUS", "SITUACAO", "SITUAÇÃO"])
+    col_obs       = encontrar_coluna(df.columns, ["OBSERVACAO", "OBSERVAÇÃO", "OBS", "OBSERVACOES", "OBSERVAÇÕES"])
 
     if col_base is None:
         return None, f"Coluna BASE não encontrada. Colunas: {list(df.columns)}"
@@ -496,6 +497,7 @@ def processar_aba(xl, sheet_name):
         "modelo_alternador":    col_mod_alt,
         "serie_alternador":     col_ser_alt,
         "status":               col_status,
+        "observacao":           col_obs,
     }
     cols_validas = {k: v for k, v in cols_usar.items() if v is not None}
 
@@ -535,6 +537,7 @@ def processar_aba(xl, sheet_name):
     if "mt_kv"               not in df.columns: df["mt_kv"]               = "—"
     if "relacao"             not in df.columns: df["relacao"]             = "—"
     if "status"              not in df.columns: df["status"]              = "—"
+    if "observacao"          not in df.columns: df["observacao"]          = "—"
 
     df["status_classe"] = df["status"].apply(classificar_status)
 
@@ -589,14 +592,14 @@ def render_card_base(base_num, machines_in_base):
             {status_badge_html(row.get('status', '—'))}
             <div class="base-card-machine-row">
                 <div class="col">
-                    <span class="tag motor">MOTOR</span>
-                    <span class="modelo">{safe_val(row, 'modelo_motor')}</span>
-                    <span class="serie">Nº Série: {safe_val(row, 'serie_motor')}</span>
+                    <span class="tag motor" contenteditable="true">MOTOR</span>
+                    <span class="modelo" contenteditable="true">{safe_val(row, 'modelo_motor')}</span>
+                    <span class="serie" contenteditable="true">Nº Série: {safe_val(row, 'serie_motor')}</span>
                 </div>
                 <div class="col">
-                    <span class="tag alt">ALTERNADOR</span>
-                    <span class="modelo">{safe_val(row, 'modelo_alternador')}</span>
-                    <span class="serie">Nº Série: {safe_val(row, 'serie_alternador')}</span>
+                    <span class="tag alt" contenteditable="true">ALTERNADOR</span>
+                    <span class="modelo" contenteditable="true">{safe_val(row, 'modelo_alternador')}</span>
+                    <span class="serie" contenteditable="true">Nº Série: {safe_val(row, 'serie_alternador')}</span>
                 </div>
             </div>
         </div>
@@ -613,35 +616,35 @@ def render_card_base(base_num, machines_in_base):
         f"""
         <div class="{card_class}">
             <div class="base-card-header">
-                <span class="base-card-title">BASE {base_num:02d}</span>
-                <span class="base-card-power">{formatar_potencia(total_pot)}</span>
+                <span class="base-card-title" contenteditable="true">BASE {base_num:02d}</span>
+                <span class="base-card-power" contenteditable="true">{formatar_potencia(total_pot)}</span>
             </div>
             <div class="base-card-transformer">
                 <div class="base-card-transformer-title">⟷ TRANSFORMADOR</div>
                 <div class="base-card-transformer-grid">
                     <div class="item">
-                        <span class="label">Nº Série</span>
-                        <span class="value">{safe_val(transformador_data, 'serie_transformador')}</span>
+                        <span class="label" contenteditable="true">Nº Série</span>
+                        <span class="value" contenteditable="true">{safe_val(transformador_data, 'serie_transformador')}</span>
                     </div>
                     <div class="item">
-                        <span class="label">Fabricante</span>
-                        <span class="value">{safe_val(transformador_data, 'fab_trafo')}</span>
+                        <span class="label" contenteditable="true">Fabricante</span>
+                        <span class="value" contenteditable="true">{safe_val(transformador_data, 'fab_trafo')}</span>
                     </div>
                     <div class="item">
-                        <span class="label">Potência kVA</span>
-                        <span class="value">{safe_val(transformador_data, 'pot_trafo')}</span>
+                        <span class="label" contenteditable="true">Potência kVA</span>
+                        <span class="value" contenteditable="true">{safe_val(transformador_data, 'pot_trafo')}</span>
                     </div>
                     <div class="item">
-                        <span class="label">Impedância %</span>
-                        <span class="value">{safe_val(transformador_data, 'imp_trafo')}</span>
+                        <span class="label" contenteditable="true">Impedância %</span>
+                        <span class="value" contenteditable="true">{safe_val(transformador_data, 'imp_trafo')}</span>
                     </div>
                     <div class="item">
-                        <span class="label">BT / MT kV</span>
-                        <span class="value">{safe_val(transformador_data, 'bt_kv')} / {safe_val(transformador_data, 'mt_kv')}</span>
+                        <span class="label" contenteditable="true">BT / MT kV</span>
+                        <span class="value" contenteditable="true">{safe_val(transformador_data, 'bt_kv')} / {safe_val(transformador_data, 'mt_kv')}</span>
                     </div>
                     <div class="item">
-                        <span class="label">Relação</span>
-                        <span class="value">{safe_val(transformador_data, 'relacao')}</span>
+                        <span class="label" contenteditable="true">Relação</span>
+                        <span class="value" contenteditable="true">{safe_val(transformador_data, 'relacao')}</span>
                     </div>
                 </div>
             </div>
@@ -664,14 +667,25 @@ def render_card_base_17():
 
 
 def render_lista_status(df_lista, cor_hex):
-    """Monta o HTML de uma lista de máquinas (indisponíveis ou em manutenção) para uso dentro de um expander."""
     itens_html = ""
     for _, row in df_lista.iterrows():
+        obs = safe_val(row, 'observacao')
+        obs_badge = ""
+        if obs and obs != "—":
+            obs_badge = f"""
+            <span style="display:inline-block; background:#f59e0b22; color:#f59e0b;
+                         border:1px solid #f59e0b55; border-radius:6px; padding:2px 8px;
+                         font-size:11px; font-weight:700; margin-left:8px;"
+                  contenteditable="true">
+                ⚠️ {obs}
+            </span>
+            """
+
         itens_html += f"""
         <div class="status-list-item">
-            <span class="base-tag" style="color:{cor_hex};">Base {row['label']}</span>
+            <span class="base-tag" style="color:{cor_hex};" contenteditable="true">Base {row['label']}</span>
             {safe_val(row, 'modelo_motor')} / {safe_val(row, 'modelo_alternador')}
-            — <em>{safe_val(row, 'status')}</em>
+            — <em>{safe_val(row, 'status')}</em>{obs_badge}
         </div>
         """
     st.markdown(itens_html, unsafe_allow_html=True)
@@ -681,7 +695,7 @@ def render_lista_status(df_lista, cor_hex):
 
 def tela_patio_planejado(df):
     st.markdown("# 📋 Usina Xavantes S/A - Pátio de Máquinas")
-    st.markdown("<hr class='separador'>", unsafe_allow_html=True)
+    st.markdown('<hr class="separador">', unsafe_allow_html=True)
 
     if df is None or df.empty:
         st.error("Não foi possível carregar os dados do pátio planejado.")
@@ -702,8 +716,8 @@ def tela_patio_planejado(df):
     if qtd_nao_informado > 0:
         resumo_extra = f"""
         <div class="resumo-item">
-            <span class="resumo-label">Status não informado</span>
-            <span class="resumo-valor" style="color:#8888aa;">{qtd_nao_informado}</span>
+            <span class="resumo-label" contenteditable="true">Status não informado</span>
+            <span class="resumo-valor" style="color:#8888aa;" contenteditable="true">{qtd_nao_informado}</span>
         </div>
         """
 
@@ -712,24 +726,24 @@ def tela_patio_planejado(df):
         <div class="resumo-box">
             <h3 style="color:#e0e0f0; margin:0; padding:0;">Total de Máquinas: {total_maquinas}</h3>
             <div class="resumo-item">
-                <span class="resumo-label">Potência Disponível</span>
-                <span class="resumo-valor" style="color:#22c55e;">{formatar_potencia(potencia_disponivel)}</span>
+                <span class="resumo-label" contenteditable="true">Potência Disponível</span>
+                <span class="resumo-valor" style="color:#22c55e;" contenteditable="true">{formatar_potencia(potencia_disponivel)}</span>
             </div>
             <div class="resumo-item">
-                <span class="resumo-label">Potência Indisponível</span>
-                <span class="resumo-valor" style="color:#ef4444;">{formatar_potencia(potencia_indisponivel)}</span>
+                <span class="resumo-label" contenteditable="true">Potência Indisponível</span>
+                <span class="resumo-valor" style="color:#ef4444;" contenteditable="true">{formatar_potencia(potencia_indisponivel)}</span>
             </div>
             <div class="resumo-item">
-                <span class="resumo-label">Potência em Manutenção</span>
-                <span class="resumo-valor" style="color:#f59e0b;">{formatar_potencia(potencia_manutencao)}</span>
+                <span class="resumo-label" contenteditable="true">Potência em Manutenção</span>
+                <span class="resumo-valor" style="color:#f59e0b;" contenteditable="true">{formatar_potencia(potencia_manutencao)}</span>
             </div>
             <div class="resumo-item">
-                <span class="resumo-label">Máquinas Indisponíveis</span>
-                <span class="resumo-valor" style="color:#ef4444;">{qtd_indisponiveis}</span>
+                <span class="resumo-label" contenteditable="true">Máquinas Indisponíveis</span>
+                <span class="resumo-valor" style="color:#ef4444;" contenteditable="true">{qtd_indisponiveis}</span>
             </div>
             <div class="resumo-item">
-                <span class="resumo-label">Máquinas em Manutenção</span>
-                <span class="resumo-valor" style="color:#f59e0b;">{qtd_manutencao}</span>
+                <span class="resumo-label" contenteditable="true">Máquinas em Manutenção</span>
+                <span class="resumo-valor" style="color:#f59e0b;" contenteditable="true">{qtd_manutencao}</span>
             </div>
             {resumo_extra}
         </div>
@@ -752,7 +766,7 @@ def tela_patio_planejado(df):
                     render_card_base(base_num, machines_in_base)
 
     # --- Listas suspensas no rodapé da página ---
-    st.markdown("<hr class='separador'>", unsafe_allow_html=True)
+    st.markdown('<hr class="separador">', unsafe_allow_html=True)
     st.markdown("### 📑 Detalhamento por Status")
 
     df_indisponiveis = df_com_maquina[df_com_maquina["status_classe"] == "indisponivel"].sort_values(["base", "posicao"])
@@ -779,7 +793,7 @@ def main():
         st.markdown("## ⚙️ Pátio de Máquinas")
         st.markdown("---")
         st.markdown("**Usina Xavantes**")
-        st.markdown("<small style='color:#8888bb'>Módulo: Planejado</small>", unsafe_allow_html=True)
+        st.markdown('<small style="color:#8888bb">Módulo: Planejado</small>', unsafe_allow_html=True)
         st.markdown("---")
 
         if st.button("🔄 Recarregar dados", key="sidebar_btn_recarregar"):
