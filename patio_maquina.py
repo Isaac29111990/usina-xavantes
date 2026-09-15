@@ -667,6 +667,7 @@ def render_card_base_17():
 
 
 def render_lista_status(df_lista, cor_hex):
+    """Monta o HTML de uma lista de máquinas (indisponíveis ou em manutenção) para uso dentro de um expander."""
     itens_html = ""
     for _, row in df_lista.iterrows():
         obs = safe_val(row, 'observacao')
@@ -712,6 +713,13 @@ def tela_patio_planejado(df):
     qtd_manutencao     = int((df_com_maquina["status_classe"] == "manutencao").sum())
     qtd_nao_informado  = int((df_com_maquina["status_classe"] == "indefinido").sum())
 
+    # --- Potência disponível dividida por Linha (L1: bases 01-16 / L2: bases 18-36) ---
+    df_linha1 = df_com_maquina[df_com_maquina["base"].between(1, 16)]
+    df_linha2 = df_com_maquina[df_com_maquina["base"].between(18, 36)]
+
+    pot_disp_l1 = df_linha1.loc[df_linha1["status_classe"] == "disponivel", "pot_maquina_num"].sum()
+    pot_disp_l2 = df_linha2.loc[df_linha2["status_classe"] == "disponivel", "pot_maquina_num"].sum()
+
     resumo_extra = ""
     if qtd_nao_informado > 0:
         resumo_extra = f"""
@@ -728,6 +736,11 @@ def tela_patio_planejado(df):
             <div class="resumo-item">
                 <span class="resumo-label" contenteditable="true">Potência Disponível</span>
                 <span class="resumo-valor" style="color:#22c55e;" contenteditable="true">{formatar_potencia(potencia_disponivel)}</span>
+                <span style="display:block; font-size:11px; color:#8888aa; margin-top:2px;" contenteditable="true">
+                    L1: <strong style="color:#22c55e;">{formatar_potencia(pot_disp_l1)}</strong>
+                    &nbsp;|&nbsp;
+                    L2: <strong style="color:#22c55e;">{formatar_potencia(pot_disp_l2)}</strong>
+                </span>
             </div>
             <div class="resumo-item">
                 <span class="resumo-label" contenteditable="true">Potência Indisponível</span>
